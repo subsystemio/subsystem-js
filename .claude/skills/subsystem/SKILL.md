@@ -201,14 +201,36 @@ path into `node_modules`:
 `build` / `flash` / `mcp` / `help`. Building needs no card and no Pi — it cross-builds anywhere;
 `flash` finds the single mounted DietPi card, or takes the volume as an argument.
 
-Per-device settings live in the subsystem's own `package.json`, so local runs match the card:
+The MCP box is built the same way, from a checkout of `master-control`:
+`subsystem-image mcp ../master-control /Volumes/bootfs`.
+
+### Where a setting belongs
+
+Two categories, and conflating them is how a secret gets committed.
+
+**Hardware** goes in the app's `package.json` and is committed — the app is 1:1 with a Pi, so what
+you run locally is what boots:
 
 ```json
 "subsystem": { "port": 9080, "resetAfter": 0, "resX": 1280, "resY": 720 }
 ```
 
-The MCP box is built the same way, from a checkout of `master-control`:
-`subsystem-image mcp ../master-control /Volumes/bootfs`.
+**A venue's** settings go in `.env` beside the app, gitignored: `WIFI_SSID`, `WIFI_KEY`, `PASSWORD`,
+and `MCP`/`ROOM` when flashing for an MCP on another machine. It is parsed, never sourced, stripped
+from the payload, and caught by the build's key-material guard.
+
+Precedence, highest first: **flag → environment → `.env` → `package.json` → discovered → default.**
+All of it is resolved in `bin/subsystem-image.js`; the shell scripts default nothing, so there is
+only ever one place that decides what a value is.
+
+`--mcp` and `--room` default to `mcp key` and `mcp room`, which means **master-control must be on
+your PATH** (`npm install -g github:subsystemio/master-control`) and `mcp serve` must have run once
+before you flash anything. A card flashed with no MCP key boots and works — it is simply invisible
+to every console, forever. Never resolve a key by reaching into someone's checkout: that was the
+original design here and it hardcoded one developer's home directory into a shipping tool.
+
+Wi-Fi and the device password are consumed by DietPi on **first boot only**. Changing them later
+means `dietpi-config` on the device or a reflash.
 
 ### Hardware — verified, not guessed
 
