@@ -17,7 +17,9 @@ const { roomKey } = require('../lib/room.js')
 const FW_VERSION = '0.3.0'
 
 const args = Bare.argv.slice(2)
-const appDir = path.resolve(args.find((a) => !a.startsWith('--')) || path.join(__dirname, '..', 'apps', 'tile-puzzle'))
+const appDir = path.resolve(
+  args.find((a) => !a.startsWith('--')) || path.join(__dirname, '..', 'apps', 'tile-puzzle')
+)
 const port = Number(flag('port') || 9080)
 const host = flag('host') || '127.0.0.1'
 const resetAfter = Number(flag('reset-after') || 0)
@@ -25,7 +27,7 @@ const resetAfter = Number(flag('reset-after') || 0)
 // a laptop. Locally it is just the app's own media dir.
 const assets = flag('assets') || path.join(appDir, 'media')
 
-function flag (name) {
+function flag(name) {
   const hit = args.find((a) => a.startsWith('--' + name + '='))
   return hit && hit.slice(name.length + 3)
 }
@@ -35,9 +37,13 @@ function flag (name) {
 // subsystem-media and reboot" work with no code change and no controller.
 const MEDIA = /\.(jpe?g|png|webp|gif|svg|mp4|webm|ogv|mp3|woff2)$/i
 
-function listMedia (dir) {
+function listMedia(dir) {
   try {
-    return fs.readdirSync(dir).filter((n) => MEDIA.test(n)).sort().map((n) => '/media/' + n)
+    return fs
+      .readdirSync(dir)
+      .filter((n) => MEDIA.test(n))
+      .sort()
+      .map((n) => '/media/' + n)
   } catch {
     return []
   }
@@ -46,7 +52,7 @@ function listMedia (dir) {
 // `key = value` lines from <assets>/config.txt, with `#` comments. Lives beside the art on the FAT
 // boot partition so credentials and the like are editable on the card without a rebuild. Values
 // stay host-side: an app validates against them, so a secret never has to reach the page.
-function readConfig (dir) {
+function readConfig(dir) {
   let text
   try {
     text = b4a.toString(fs.readFileSync(path.join(dir, 'config.txt')), 'utf8')
@@ -67,23 +73,31 @@ function readConfig (dir) {
 // Room membership and the admin allowlist both come off the card, from config.txt. Running both
 // ends on one machine, fall back to what the controller generated so a dev never copies secrets by
 // hand — and the repo's config.txt stays blank.
-function repoFile (name) {
+function repoFile(name) {
   const file = path.join(__dirname, '..', name)
   return fs.existsSync(file) ? b4a.toString(fs.readFileSync(file), 'utf8').trim() : null
 }
 
-function admins (config) {
+function admins(config) {
   const list = config.admins || config.admin || repoFile('.controller-key') || ''
-  return String(list).split(',').map((x) => x.trim()).filter((x) => /^[0-9a-f]{64}$/i.test(x))
+  return String(list)
+    .split(',')
+    .map((x) => x.trim())
+    .filter((x) => /^[0-9a-f]{64}$/i.test(x))
 }
 
-async function main () {
+async function main() {
   const ui = new UIHost({ host, port, assets, log: (m) => console.log('[ui]', m) })
   await ui.start()
 
   const media = listMedia(assets)
   const config = readConfig(assets)
-  console.log('[subsystem] media from ' + assets + ' ' + (media.length ? '(' + media.join(', ') + ')' : '(empty)'))
+  console.log(
+    '[subsystem] media from ' +
+      assets +
+      ' ' +
+      (media.length ? '(' + media.join(', ') + ')' : '(empty)')
+  )
   const keys = Object.keys(config)
   if (keys.length) console.log('[subsystem] config: ' + keys.join(', '))
 
@@ -94,7 +108,10 @@ async function main () {
     log: (m) => console.log('[app]', m),
     onReport: (state) => {
       if (!resetAfter || state.phase !== 'complete' || resetTimer) return
-      resetTimer = setTimeout(() => { resetTimer = null; ipc.command('reset') }, resetAfter * 1000)
+      resetTimer = setTimeout(() => {
+        resetTimer = null
+        ipc.command('reset')
+      }, resetAfter * 1000)
     }
   })
 
@@ -107,7 +124,9 @@ async function main () {
   const room = roomKey(config.room) || roomKey(repoFile('.room-key'))
   let link = null
   if (!room) {
-    console.log('[subsystem] no `room` secret in config.txt — running unwatched, which is a valid mode')
+    console.log(
+      '[subsystem] no `room` secret in config.txt — running unwatched, which is a valid mode'
+    )
   } else {
     const { Link } = require('../lib/link.js')
     link = new Link(ipc, {
@@ -126,4 +145,7 @@ async function main () {
   })
 }
 
-main().catch((e) => { console.error('[subsystem] fatal', e); Bare.exit(1) })
+main().catch((e) => {
+  console.error('[subsystem] fatal', e)
+  Bare.exit(1)
+})

@@ -3,13 +3,24 @@
   "version": "0.1.0",
   "description": "One device, one job — announce it into a room, declare what it can do, let an operator drive it",
   "main": "index.js",
-  "bin": { "subsystem": "bin/subsystem.js" },
-  "files": ["index.js", "lib", "bin"],
+  "bin": {
+    "subsystem": "bin/subsystem.js"
+  },
+  "files": [
+    "index.js",
+    "lib",
+    "bin"
+  ],
   "scripts": {
     "test": "bare test/all.js",
-    "example": "bare bin/subsystem.js example/counter"
+    "example": "bare bin/subsystem.js example/counter",
+    "format": "prettier --write .",
+    "lint": "prettier --check ."
   },
-  "repository": { "type": "git", "url": "git+https://github.com/subsystemio/subsystem-js.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/subsystemio/subsystem-js.git"
+  },
   "author": "subsystem.io",
   "license": "MIT",
   "dependencies": {
@@ -23,5 +34,9 @@
     "hyperswarm": "^4.17.0",
     "hyperswarm-capability": "^1.1.1",
     "protomux": "^3.11.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "prettier-config-holepunch": "^2.0.0"
   }
 }

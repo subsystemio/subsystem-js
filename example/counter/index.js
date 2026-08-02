@@ -1,6 +1,6 @@
 // The smallest useful subsystem: a button that counts. It declares what it is, what it accepts and
 // how a console should draw it — the console needs no knowledge of counters.
-module.exports = async function start (ipc, ready) {
+module.exports = async function start(ipc, ready) {
   let count = 0
   let target = Number((ipc.config || {}).target) || 5
 
@@ -33,13 +33,26 @@ module.exports = async function start (ipc, ready) {
   })
 
   ipc.onCommand((name, args) => {
-    if (name === 'bump') { bump(); return count }
-    if (name === 'reset') { count = 0; ipc.sendUI({ t: 'count', count, target }); report(); return 'ok' }
-    if (name === 'setTarget') { target = Number(args && args.n) || target; ipc.sendUI({ t: 'count', count, target }); report(); return target }
+    if (name === 'bump') {
+      bump()
+      return count
+    }
+    if (name === 'reset') {
+      count = 0
+      ipc.sendUI({ t: 'count', count, target })
+      report()
+      return 'ok'
+    }
+    if (name === 'setTarget') {
+      target = Number(args && args.n) || target
+      ipc.sendUI({ t: 'count', count, target })
+      report()
+      return target
+    }
     throw new Error('unknown command: ' + name)
   })
 
   report()
   if (ready) ready()
-  return async function stop () {}
+  return async function stop() {}
 }

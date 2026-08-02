@@ -15,10 +15,10 @@ npm install subsystem
 A subsystem is a single function. It gets an `ipc` seam and declares itself:
 
 ```js
-module.exports = async function start (ipc, ready) {
+module.exports = async function start(ipc, ready) {
   let count = 0
 
-  ipc.serveUI(require('./ui.js'))            // an HTML page, served locally
+  ipc.serveUI(require('./ui.js')) // an HTML page, served locally
 
   ipc.describe({
     id: 'counter',
@@ -32,13 +32,20 @@ module.exports = async function start (ipc, ready) {
   })
 
   ipc.onCommand((name) => {
-    if (name === 'bump') { count++; ipc.emit('bumped', { count }); return count }
-    if (name === 'reset') { count = 0; return 'ok' }
+    if (name === 'bump') {
+      count++
+      ipc.emit('bumped', { count })
+      return count
+    }
+    if (name === 'reset') {
+      count = 0
+      return 'ok'
+    }
     throw new Error('unknown command: ' + name)
   })
 
   if (ready) ready()
-  return async function stop () {}
+  return async function stop() {}
 }
 ```
 
@@ -70,11 +77,11 @@ told about.
 
 A subsystem holds a **room secret**; operators hold a **keypair**. That split is deliberate.
 
-| Job | Mechanism |
-|---|---|
-| Find the room | topic = one-way hash of the room secret |
-| Be let in | [`hyperswarm-capability`](https://github.com/holepunchto/hyperswarm-capability) proof bound to the connection's handshake hash |
-| **Command** a subsystem | sender's key is on the subsystem's admin allowlist — **public keys only** |
+| Job                     | Mechanism                                                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Find the room           | topic = one-way hash of the room secret                                                                                        |
+| Be let in               | [`hyperswarm-capability`](https://github.com/holepunchto/hyperswarm-capability) proof bound to the connection's handshake hash |
+| **Command** a subsystem | sender's key is on the subsystem's admin allowlist — **public keys only**                                                      |
 
 So a device carries enough to join and be watched, and nothing that grants control. The secret never
 crosses the wire — only a proof does, and that proof is worthless on any other connection. Anyone

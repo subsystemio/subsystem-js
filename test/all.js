@@ -5,7 +5,7 @@ const protocol = require('../lib/protocol.js')
 const { roomKey, topic } = require('../lib/room.js')
 
 let ran = 0
-function is (actual, expected, msg) {
+function is(actual, expected, msg) {
   ran++
   const a = JSON.stringify(actual)
   const e = JSON.stringify(expected)
