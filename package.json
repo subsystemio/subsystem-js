@@ -12,7 +12,7 @@
     "bin"
   ],
   "scripts": {
-    "test": "bare test/all.js",
+    "test": "brittle-bare test/all.js",
     "example": "bare bin/subsystem.js example/counter",
     "format": "prettier --write .",
     "lint": "prettier --check ."
@@ -36,6 +36,7 @@
     "protomux": "^3.11.0"
   },
   "devDependencies": {
+    "brittle": "^4.1.0",
     "prettier": "^3.6.2",
     "prettier-config-holepunch": "^2.0.0"
   }
