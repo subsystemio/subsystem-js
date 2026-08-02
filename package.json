@@ -16,7 +16,8 @@
     "test": "brittle-bare test/all.js",
     "example": "bare bin/subsystem.js example/counter",
     "format": "prettier --write .",
-    "lint": "prettier --check ."
+    "lint": "prettier --check .",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "repository": {
     "type": "git",

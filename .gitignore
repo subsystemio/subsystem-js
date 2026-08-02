@@ -3,3 +3,4 @@ package-lock.json
 **/.identity/
 *.log
 .DS_Store
+.env
