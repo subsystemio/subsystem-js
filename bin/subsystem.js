@@ -8,7 +8,7 @@ const { roomKey } = require('../lib/room.js')
 
 // What runs on a Pi. One subsystem, one app, one physical element.
 //
-//   subsystem [appDir] [--port=9080] [--host=127.0.0.1] [--reset-after=20]
+//   sub [appDir] [--port=9080] [--host=127.0.0.1] [--reset-after=20]
 //                      [--assets=<dir>] [--mcp=<64-hex>] [--room=<secret>]
 //
 // The app boots, serves its display and works with no network at all. A master controller is
@@ -17,9 +17,14 @@ const { roomKey } = require('../lib/room.js')
 const FW_VERSION = '0.4.0'
 
 const args = Bare.argv.slice(2)
-const appDir = path.resolve(
-  args.find((a) => !a.startsWith('--')) || path.join(__dirname, '..', 'apps', 'tile-puzzle')
-)
+const appDir = path.resolve(args.find((a) => !a.startsWith('--')) || '.')
+// Checked before anything binds a port: starting the UI host and *then* failing to find the app
+// leaves a listener up and buries the real cause under a module error.
+if (!fs.existsSync(path.join(appDir, 'index.js'))) {
+  console.error('[subsystem] no index.js in ' + appDir)
+  console.error('[subsystem] usage: sub <appDir>')
+  Bare.exit(1)
+}
 const port = Number(flag('port') || 9080)
 const host = flag('host') || '127.0.0.1'
 const resetAfter = Number(flag('reset-after') || 0)

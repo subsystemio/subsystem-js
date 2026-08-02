@@ -272,6 +272,23 @@ destroys the stream — and the peer reconnects straight into the same trap, for
 **Never mint a new identity because a file is missing.** A regenerated MCP key or room secret orphans
 every card silently, and you find out in a venue. Restore from the mirror, or refuse to start.
 
+**State must not live beside the code.** `master-control` kept its identity in `__dirname`, so
+`npm install -g` would have parked the fleet's private key inside `node_modules` for the next
+upgrade to delete. It defaults to `~/.master-control` now, with `--dir`/`MCP_DIR`. Anything a
+reinstall can erase is the wrong home for a key that cards in the field depend on.
+
+**Validate before you bind.** The runner used to start the UI host and _then_ resolve the app, so a
+bad path left a listener on 9080 and reported a module error instead of the real cause.
+
+**npm caches `github:` dependencies by ref.** After pushing a fix to `runtime` or `subsystem-image`,
+a plain `npm install` in a consumer silently keeps the old copy. Delete it from `node_modules`
+first, or you will debug a bug you already fixed — twice, in my case.
+
+**A running subsystem does not match `pkill -f subsystem.js`.** npm invokes it through the bin
+symlink, so the command line reads `bare …/node_modules/.bin/sub .`. Find it with
+`lsof -nP -tiTCP:9080 -sTCP:LISTEN` and kill the PID. A stale server squatting the port is what
+produced a whole session of "why does the page say waiting".
+
 **Chromium ignores `autocomplete="off"` on password fields.** Suppressing the save-password bubble
 requires a managed policy at `/etc/chromium{,-browser}/policies/managed/`. Markup hints are
 best-effort only.
