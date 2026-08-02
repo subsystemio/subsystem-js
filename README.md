@@ -59,10 +59,10 @@ module.exports = async function start(ipc, ready) {
 }
 ```
 
-Run it, from a checkout of this repo:
+Run it. Installed as a dependency you get a `sub` command (and `subsystem`, the long form):
 
 ```sh
-npm run example                     # or: bare bin/subsystem.js ./example/counter
+sub ./my-subsystem                  # or from a checkout: npm run example
 ```
 
 That serves the page on `http://127.0.0.1:9080`. Give it an MCP's public key and it also announces
@@ -135,7 +135,9 @@ subsystem, and they never reach the browser.
 
 Also exported: `protocol`, `channels`, `room`, `identity` — what an MCP is built from.
 
-#### `subsystem <dir> [--port=9080] [--host=127.0.0.1] [--assets=<dir>] [--reset-after=0] [--mcp=<64-hex>] [--room=<secret>]`
+#### `sub <dir> [--port=9080] [--host=127.0.0.1] [--assets=<dir>] [--reset-after=0] [--mcp=<64-hex>] [--room=<secret>]`
+
+Also installed as `subsystem` if you prefer the long name.
 
 Runs a subsystem directory. Never on the boot path: the app serves its display before any network
 exists, and keeps running whether or not anyone connects.

@@ -1,10 +1,11 @@
 {
   "name": "@subsystemio/runtime",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Runtime for subsystems — one device, one job, announced into a fleet an MCP can watch and drive",
   "main": "index.js",
   "bin": {
-    "subsystem": "bin/subsystem.js"
+    "subsystem": "bin/subsystem.js",
+    "sub": "bin/subsystem.js"
   },
   "files": [
     "index.js",
