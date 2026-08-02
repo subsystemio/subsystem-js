@@ -1,0 +1,27 @@
+{
+  "name": "subsystem",
+  "version": "0.1.0",
+  "description": "One device, one job — announce it into a room, declare what it can do, let an operator drive it",
+  "main": "index.js",
+  "bin": { "subsystem": "bin/subsystem.js" },
+  "files": ["index.js", "lib", "bin"],
+  "scripts": {
+    "test": "bare test/all.js",
+    "example": "bare bin/subsystem.js example/counter"
+  },
+  "repository": { "type": "git", "url": "git+https://github.com/subsystemio/subsystem-js.git" },
+  "author": "subsystem.io",
+  "license": "MIT",
+  "dependencies": {
+    "b4a": "^1.8.1",
+    "bare-fs": "^4.7.2",
+    "bare-http1": "^4.5.7",
+    "bare-path": "^3.0.0",
+    "bare-ws": "^3.0.0",
+    "compact-encoding": "^3.3.0",
+    "hypercore-crypto": "^3.7.0",
+    "hyperswarm": "^4.17.0",
+    "hyperswarm-capability": "^1.1.1",
+    "protomux": "^3.11.0"
+  }
+}

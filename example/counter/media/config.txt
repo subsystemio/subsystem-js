@@ -1,0 +1,8 @@
+# The counter example needs no room to run.
+# Add a room secret to have it announce itself:
+#   room = any-shared-phrase
+#   admins = <operator public key>
+
+target = 5
+room =
+admins =
