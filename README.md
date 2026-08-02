@@ -1,13 +1,23 @@
-# subsystem
+# @subsystemio/runtime
 
-One device, one job. A subsystem announces itself into a room, declares what it can do, and lets an
+One device, one job. A subsystem announces itself into a fleet, declares what it can do, and lets an
 operator drive it — while working perfectly well with nobody watching.
 
 Built on [Bare](https://github.com/holepunchto/bare) and Hyperswarm. No servers, no addresses to
 configure, no cloud.
 
+## Install
+
+Bare is the runtime everything here runs on, so install it first:
+
+```sh
+npm install -g bare
 ```
-npm install subsystem
+
+Then the package. It is not on npm yet — take it from GitHub:
+
+```sh
+npm install github:subsystemio/runtime
 ```
 
 ## Usage
@@ -49,14 +59,18 @@ module.exports = async function start(ipc, ready) {
 }
 ```
 
-Run it:
+Run it, from a checkout of this repo:
 
-```
-npx subsystem ./example/counter
+```sh
+npm run example                     # or: bare bin/subsystem.js ./example/counter
 ```
 
-That serves the page on `http://127.0.0.1:9080` and, if a room secret is configured, announces the
-subsystem so consoles can find it.
+That serves the page on `http://127.0.0.1:9080`. Give it an MCP's public key and it also announces
+itself so that MCP can find it:
+
+```sh
+bare bin/subsystem.js ./example/counter --mcp=<64-hex>
+```
 
 ## The manifest is the API
 
@@ -73,23 +87,26 @@ there is no per-subsystem code anywhere else, and no codegen.
 Fields you report but never declare still show up. A console should never silently hide state it was
 told about.
 
-## Rooms: three jobs, three mechanisms
+## One MCP, many operators
 
-A subsystem holds a **room secret**; operators hold a **keypair**. That split is deliberate.
+A subsystem trusts exactly one peer: its [MCP](https://github.com/subsystemio/master-control).
+Operators talk to the MCP, never to a subsystem — which is what lets a card carry nothing but a
+public key and never be touched again.
 
-| Job                     | Mechanism                                                                                                                      |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Find the room           | topic = one-way hash of the room secret                                                                                        |
-| Be let in               | [`hyperswarm-capability`](https://github.com/holepunchto/hyperswarm-capability) proof bound to the connection's handshake hash |
-| **Command** a subsystem | sender's key is on the subsystem's admin allowlist — **public keys only**                                                      |
+| Job                         | Mechanism                                             | On the card               |
+| --------------------------- | ----------------------------------------------------- | ------------------------- |
+| Find the fleet              | topic = one-way hash of the MCP's **public** key      | a public key              |
+| **Command** a subsystem     | the peer _is_ that MCP, proven by the Noise handshake | nothing                   |
+| Hide the fleet _(optional)_ | a shared room secret mixed into the topic             | a secret, if you want one |
 
-So a device carries enough to join and be watched, and nothing that grants control. The secret never
-crosses the wire — only a proof does, and that proof is worthless on any other connection. Anyone
-failing the gate is dropped before a single byte of state is sent; they cannot even learn the
-subsystem exists.
+**A stolen SD card yields a public key and nothing else.** There is no bearer credential to leak, no
+secret to rotate, and no per-operator configuration anywhere near a device. Adding or removing an
+operator is one edit on the MCP.
 
-The read/write split is the useful part: a second operator can watch a whole room with the secret
-alone, and gets no ability to touch anything until their public key is added.
+The room secret is optional and off by default. Without it, anyone who learns the MCP's public key
+can derive the topic and see that _some_ devices exist — they still cannot read state or command
+anything, because a subsystem drops every peer that is not its MCP before disclosing a thing. Turn
+it on with `mcp serve --private-room` if that metadata matters.
 
 ## Configuration
 
@@ -97,9 +114,9 @@ Everything a device needs sits in `media/config.txt` next to its assets, so it c
 SD card without a rebuild:
 
 ```
-room    = any shared phrase
-admins  = <operator public key>[, <another>]
-target  = 5
+mcp    = <the MCP's 64-hex public key>
+room   = a shared phrase        # optional, only if the MCP runs --private-room
+target = 5                      # anything else your app wants
 ```
 
 Values reach the app as `ipc.config`. Secrets stay host-side — validate against them in the
@@ -113,12 +130,12 @@ subsystem, and they never reach the browser.
   and a localhost WebSocket. `/media/` serves media types only; `config.txt` is never reachable.
 - **`IPC`** — the seam the app is written against: `serveUI` · `sendUI` · `onUIMessage` ·
   `describe` · `emit` · `reportState` · `onCommand` · `media` · `config`.
-- **`Link`** — optional room presence: announces on the topic, runs the capability gate, enforces
-  the admin allowlist, broadcasts telemetry to every watcher.
+- **`Link`** — optional fleet presence: finds the MCP on the topic, refuses every other peer, and
+  reports telemetry to it. Never on the boot path.
 
-Also exported: `protocol`, `channels`, `room`, `identity` — for building a console.
+Also exported: `protocol`, `channels`, `room`, `identity` — what an MCP is built from.
 
-#### `subsystem <dir> [--port=9080] [--host=127.0.0.1] [--assets=<dir>] [--reset-after=0]`
+#### `subsystem <dir> [--port=9080] [--host=127.0.0.1] [--assets=<dir>] [--reset-after=0] [--mcp=<64-hex>] [--room=<secret>]`
 
 Runs a subsystem directory. Never on the boot path: the app serves its display before any network
 exists, and keeps running whether or not anyone connects.

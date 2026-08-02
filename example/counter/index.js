@@ -44,7 +44,8 @@ module.exports = async function start(ipc, ready) {
       return 'ok'
     }
     if (name === 'setTarget') {
-      target = Number(args && args.n) || target
+      const n = Number(args && args.n)
+      target = Number.isFinite(n) && n >= 0 ? n : target
       ipc.sendUI({ t: 'count', count, target })
       report()
       return target

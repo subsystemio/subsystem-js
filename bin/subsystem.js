@@ -9,12 +9,12 @@ const { roomKey } = require('../lib/room.js')
 // What runs on a Pi. One subsystem, one app, one physical element.
 //
 //   subsystem [appDir] [--port=9080] [--host=127.0.0.1] [--reset-after=20]
-//                      [--assets=<dir>] [--room]
+//                      [--assets=<dir>] [--mcp=<64-hex>] [--room=<secret>]
 //
 // The app boots, serves its display and works with no network at all. A master controller is
 // strictly optional and strictly additive: it observes state and invokes commands the app declared
 // for itself. It cannot deploy code — apps ship on the SD card.
-const FW_VERSION = '0.3.0'
+const FW_VERSION = '0.4.0'
 
 const args = Bare.argv.slice(2)
 const appDir = path.resolve(
@@ -70,20 +70,17 @@ function readConfig(dir) {
   return out
 }
 
-// Room membership and the admin allowlist both come off the card, from config.txt. Running both
-// ends on one machine, fall back to what the controller generated so a dev never copies secrets by
-// hand — and the repo's config.txt stays blank.
-function repoFile(name) {
-  const file = path.join(__dirname, '..', name)
+// Which MCP this subsystem answers to, and optionally which private room. Both come off the card
+// via config.txt; flags win, so a dev can point one at a local MCP without editing anything.
+//
+// The MCP key is PUBLIC — losing a card leaks nothing.
+function trimmed(file) {
   return fs.existsSync(file) ? b4a.toString(fs.readFileSync(file), 'utf8').trim() : null
 }
 
-function admins(config) {
-  const list = config.admins || config.admin || repoFile('.controller-key') || ''
-  return String(list)
-    .split(',')
-    .map((x) => x.trim())
-    .filter((x) => /^[0-9a-f]{64}$/i.test(x))
+function mcpKey(config) {
+  const v = flag('mcp') || config.mcp || trimmed(path.join(appDir, '.mcp-key'))
+  return v && /^[0-9a-f]{64}$/i.test(v.trim()) ? v.trim() : null
 }
 
 async function main() {
@@ -101,19 +98,20 @@ async function main() {
   const keys = Object.keys(config)
   if (keys.length) console.log('[subsystem] config: ' + keys.join(', '))
 
+  const ipc = new IPC(ui, { media, config, log: (m) => console.log('[app]', m) })
+
   let resetTimer = null
-  const ipc = new IPC(ui, {
-    media,
-    config,
-    log: (m) => console.log('[app]', m),
-    onReport: (state) => {
-      if (!resetAfter || state.phase !== 'complete' || resetTimer) return
-      resetTimer = setTimeout(() => {
-        resetTimer = null
-        ipc.command('reset')
-      }, resetAfter * 1000)
-    }
-  })
+  if (resetAfter) {
+    ipc.observe({
+      onReport: (state) => {
+        if (state.phase !== 'complete' || resetTimer) return
+        resetTimer = setTimeout(() => {
+          resetTimer = null
+          ipc.command('reset')
+        }, resetAfter * 1000)
+      }
+    })
+  }
 
   const start = require(path.join(appDir, 'index.js'))
   const stop = await start(ipc, () => console.log('[subsystem] app ready'))
@@ -121,17 +119,15 @@ async function main() {
   ipc.setState(1) // arm on boot — a subsystem is useful before anything upstream exists
   console.log('[subsystem] ' + path.basename(appDir) + ' armed at ' + ui.url())
 
-  const room = roomKey(config.room) || roomKey(repoFile('.room-key'))
+  const mcp = mcpKey(config)
   let link = null
-  if (!room) {
-    console.log(
-      '[subsystem] no `room` secret in config.txt — running unwatched, which is a valid mode'
-    )
+  if (!mcp) {
+    console.log('[subsystem] no `mcp` key configured — running unwatched, which is a valid mode')
   } else {
     const { Link } = require('../lib/link.js')
     link = new Link(ipc, {
-      roomKey: room,
-      admins: admins(config),
+      mcpKey: mcp,
+      roomKey: roomKey(flag('room') || config.room), // optional: privacy, never authority
       storeDir: path.join(appDir, '.identity'),
       fwVersion: FW_VERSION,
       log: (m) => console.log('[link]', m)

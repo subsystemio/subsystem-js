@@ -1,7 +1,7 @@
 {
-  "name": "subsystem",
-  "version": "0.1.0",
-  "description": "One device, one job — announce it into a room, declare what it can do, let an operator drive it",
+  "name": "@subsystemio/runtime",
+  "version": "0.2.0",
+  "description": "Runtime for subsystems — one device, one job, announced into a fleet an MCP can watch and drive",
   "main": "index.js",
   "bin": {
     "subsystem": "bin/subsystem.js"
@@ -19,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/subsystemio/subsystem-js.git"
+    "url": "git+https://github.com/subsystemio/runtime.git"
   },
   "author": "subsystem.io",
   "license": "MIT",
