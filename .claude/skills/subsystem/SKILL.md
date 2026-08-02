@@ -9,11 +9,15 @@ version: 1.0.0
 Three repos, one idea. A **subsystem** is one device doing one job. It works alone; a console is
 optional and strictly additive.
 
-| Repo                            | What it is                         |
-| ------------------------------- | ---------------------------------- |
-| `subsystemio/subsystem-js`      | the library + `subsystem` runner   |
-| `subsystemio/master-controller` | operator console (TUI)             |
-| `subsystemio/subsystem-image`   | flashable Raspberry Pi kiosk cards |
+| Repo                          | What it is                                            |
+| ----------------------------- | ----------------------------------------------------- |
+| `subsystemio/runtime`         | `@subsystemio/runtime` — library + `subsystem` runner |
+| `subsystemio/master-control`  | the MCP: `mcp serve` daemon + `mcp` console           |
+| `subsystemio/subsystem-image` | flashable Raspberry Pi kiosk cards                    |
+
+**Nothing is on npm.** Install from GitHub (`npm install github:subsystemio/runtime`), and install
+Bare first (`npm install -g bare`) — every entry point shells out to it. Note `subsystem` on npm is
+an unrelated abandoned 2013 package; never tell anyone to install that.
 
 **The governing rule: a subsystem must work with nobody watching.** Nothing about the network is
 ever on the boot path. A dead venue Wi-Fi, a missing console, a wrong secret — none of them may
@@ -134,48 +138,41 @@ Declaring `args` on a command makes the console prompt for them.
 
 ---
 
-## 3. Rooms: three jobs, three mechanisms
+## 3. One MCP, many operators
 
-Do not collapse these. Each does one thing.
+There is exactly one MCP per installation. Subsystems trust it and nothing else; operators talk to
+the MCP and never to a subsystem. That one rule is what makes access management a single edit
+instead of a trip round every SD card.
 
-| Job           | Mechanism                                                              | On the device        |
-| ------------- | ---------------------------------------------------------------------- | -------------------- |
-| Find the room | topic = one-way hash of the room secret                                | the secret           |
-| Be let in     | `hyperswarm-capability` proof bound to the connection's handshake hash | the secret           |
-| **Command**   | sender's key on the admin allowlist                                    | **public keys only** |
+| Job                         | Mechanism                                             | On the card               |
+| --------------------------- | ----------------------------------------------------- | ------------------------- |
+| Find the fleet              | topic = one-way hash of the MCP's **public** key      | a public key              |
+| **Command** a subsystem     | the peer _is_ that MCP, proven by the Noise handshake | nothing                   |
+| Hide the fleet _(optional)_ | a room secret mixed into the topic                    | a secret, if you want one |
 
-A device carries enough to join and be watched, and **nothing that grants control**. Commanding
-needs a private key that only an operator holds; the Noise handshake proves it for free via
-`socket.remotePublicKey`.
+**A card carries no secrets.** No bearer credential to leak, nothing to rotate, no per-operator
+config anywhere near a device.
 
-The capability proof never puts the secret on the wire, and is bound to one stream so a captured
-proof is useless elsewhere. Anyone failing the gate is dropped **before any state is sent** — they
-cannot even learn a subsystem exists.
+The room secret is optional and off by default (`mcp serve --private-room`). Without it, someone who
+learns the MCP's public key can derive the topic and see that devices exist — they still cannot read
+state or command anything. `guard()` is a no-op when no secret is configured; authority was never
+its job.
 
-The read/write split is the useful part: a second operator watches a whole room with the secret
-alone and can touch nothing until their public key is added.
-
-```
-# media/config.txt on the device
-room   = any shared phrase
-admins = <operator public key>[, <another>]
-```
-
-Subsystems **announce** (`join(topic, { server: true, client: false })`); consoles **dial**
-(`{ server: false, client: true }`). Keep it that way — it preserves roles and stops
-subsystem-to-subsystem connections.
-
----
+**Trust is a roster, not a secret.** An unknown subsystem or operator arrives _pending_: shown,
+never believed, never obeyed, until an admin adopts it. The first operator on an empty roster is
+auto-adopted so there is always a way in.
 
 ## 4. The console
 
 ```sh
-npm run tui     # or: npm start, headless
+mcp serve       # the daemon, one per installation
+mcp             # a console; --host=<64-hex> for a remote MCP
+mcp key         # the public key that goes on every card
 ```
 
-First run mints an admin keypair (`.identity`) and a room secret (`.room`), then prints both. Put
-them on each device. Run **as many consoles as you like** — each dials independently, so there is no
-primary and nothing to diverge.
+First run mints the MCP's keypair and prints its public key. Run **as many consoles as you like** —
+they are clients of the one daemon, so there is nothing to diverge. `A` adopts the selected
+subsystem; a non-admin console hides the command panel rather than letting keys come back refused.
 
 The TUI renders from manifests only. The tick column follows whichever field declared
 `role: 'terminal'`. Layout fills the terminal exactly; the subsystem list scrolls rather than
@@ -225,6 +222,18 @@ and is never used on the device.
 **`hyperswarm` emits `connection` after the Noise handshake.** The stream is already open, so
 `socket.on('open', …)` never fires and channel setup never happens — every peer then times out at
 the capability gate. Set up channels immediately on `connection`.
+
+**Connection direction is NOT a reliable discriminator.** Hyperswarm will hand you a _server-side_
+socket for a peer you went looking for. Dispatch on which protocol the peer opens
+(`mux.pair({ protocol }, cb)`), and pair on the **first** protocol it opens — pairing on a later one
+leaves the earlier channel unmatched and its messages are dropped silently.
+
+**A message can arrive before the handler that reads it exists.** A peer's capability lands _during_
+`createChannels`, before `gate` is assigned. Throwing there goes into protomux's dispatch, which
+destroys the stream — and the peer reconnects straight into the same trap, forever. Buffer it.
+
+**Never mint a new identity because a file is missing.** A regenerated MCP key or room secret orphans
+every card silently, and you find out in a venue. Restore from the mirror, or refuse to start.
 
 **Chromium ignores `autocomplete="off"` on password fields.** Suppressing the save-password bubble
 requires a managed policy at `/etc/chromium{,-browser}/policies/managed/`. Markup hints are
