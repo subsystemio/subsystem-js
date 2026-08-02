@@ -1,6 +1,6 @@
 ---
 name: subsystem
-description: Build, run, watch and ship subsystems — small single-purpose devices that announce themselves into a room, declare what they can do, and get driven by an operator console. Covers the `subsystem` library and runner, `master-controller` (the console), and `subsystem-image` (flashable Raspberry Pi kiosk cards). Use for any work on a subsystem app, its manifest, room security, the console UI, or building/flashing device images.
+description: Build, run, watch and ship subsystems — small single-purpose devices that announce themselves into a room, declare what they can do, and get driven by an operator console. Covers `@subsystemio/runtime` (the library and the `sub` runner), `master-control` (the MCP daemon and console), and `subsystem-image` (flashable Raspberry Pi kiosk cards). Use for any work on a subsystem app, its manifest, room security, the console UI, or building/flashing device images.
 version: 1.0.0
 ---
 
@@ -9,11 +9,11 @@ version: 1.0.0
 Three repos, one idea. A **subsystem** is one device doing one job. It works alone; a console is
 optional and strictly additive.
 
-| Repo                          | What it is                                            |
-| ----------------------------- | ----------------------------------------------------- |
-| `subsystemio/runtime`         | `@subsystemio/runtime` — library + `subsystem` runner |
-| `subsystemio/master-control`  | the MCP: `mcp serve` daemon + `mcp` console           |
-| `subsystemio/subsystem-image` | flashable Raspberry Pi kiosk cards                    |
+| Repo                          | What it is                                          |
+| ----------------------------- | --------------------------------------------------- |
+| `subsystemio/runtime`         | `@subsystemio/runtime` — library + the `sub` runner |
+| `subsystemio/master-control`  | the MCP: `mcp serve` daemon + `mcp` console         |
+| `subsystemio/subsystem-image` | flashable Raspberry Pi kiosk cards                  |
 
 **Nothing is on npm.** Install from GitHub (`npm install github:subsystemio/runtime`), and install
 Bare first (`npm install -g bare`) — every entry point shells out to it. Note `subsystem` on npm is
@@ -64,7 +64,7 @@ module.exports = async function start(ipc, ready) {
 }
 ```
 
-Run it: `npx subsystem ./my-subsystem`
+Run it: `sub ./my-subsystem` — or `npm run dev`, see §5.
 
 ### The `ipc` seam
 
@@ -182,18 +182,33 @@ Never hardcode an app's field name in the console. If you find yourself wanting 
 
 ---
 
-## 5. Images
+## 5. Running and shipping
 
-```sh
-./build-payload.sh ./my-subsystem            # arm64 payload, cross-built anywhere
-./prepare-sd.sh ./my-subsystem /Volumes/bootfs
+Both repos install bins, so a subsystem drives everything through its own scripts and never names a
+path into `node_modules`:
+
+```json
+"scripts": {
+  "dev":   "sub .",
+  "image": "subsystem-image build .",
+  "flash": "subsystem-image flash ."
+},
+"dependencies":    { "@subsystemio/runtime": "github:subsystemio/runtime" },
+"devDependencies": { "@subsystemio/subsystem-image": "github:subsystemio/subsystem-image" }
 ```
+
+`sub` is the short bin for `subsystem`; both are installed. `subsystem-image` dispatches
+`build` / `flash` / `mcp` / `help`. Building needs no card and no Pi — it cross-builds anywhere;
+`flash` finds the single mounted DietPi card, or takes the volume as an argument.
 
 Per-device settings live in the subsystem's own `package.json`, so local runs match the card:
 
 ```json
 "subsystem": { "port": 9080, "resetAfter": 0, "resX": 1280, "resY": 720 }
 ```
+
+The MCP box is built the same way, from a checkout of `master-control`:
+`subsystem-image mcp ../master-control /Volumes/bootfs`.
 
 ### Hardware — verified, not guessed
 
