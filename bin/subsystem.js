@@ -12,7 +12,6 @@ const { command, flag, arg, summary, header, footer, bail } = require('paparam')
 // The app boots, serves its display and works with no network at all. An MCP is strictly optional
 // and strictly additive: it observes state and invokes commands the app declared for itself. It
 // cannot deploy code — apps ship on the SD card.
-const FW_VERSION = '0.4.0'
 
 // What is actually on the card, as URLs the app can hand straight to its page. Apps are pure JS
 // with no filesystem, so the host has to tell them — that is what makes "drop a new jpg in
@@ -112,7 +111,6 @@ async function main(cfg) {
       mcpKey: mcp,
       roomKey: roomKey(cfg.room || config.room), // optional: privacy, never authority
       storeDir: path.join(appDir, '.identity'),
-      fwVersion: FW_VERSION,
       log: (m) => console.log('[link]', m)
     })
     link.open()

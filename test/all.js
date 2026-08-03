@@ -6,7 +6,6 @@ const { roomKey, topic } = require('../lib/room.js')
 
 test('every protocol message round-trips', function (t) {
   const messages = {
-    hello: { fwVersion: '1.2.3' },
     describe: { appId: 'counter', appVersion: '1.0.0', caps: '{"id":"counter"}' },
     event: { name: 'bumped', payload: '{"count":3}', ts: 1770000000 },
     stateReport: { state: '{"count":3}', ts: 1770000000 },

@@ -287,8 +287,13 @@ every card silently, and you find out in a venue. Restore from the mirror, or re
 
 **State must not live beside the code.** `master-control` kept its identity in `__dirname`, so
 `npm install -g` would have parked the fleet's private key inside `node_modules` for the next
-upgrade to delete. It defaults to `~/.master-control` now, with `--dir`/`MCP_DIR`. Anything a
-reinstall can erase is the wrong home for a key that cards in the field depend on.
+upgrade to delete. It is `~/.master-control`, or `--dir`/`MCP_DIR` — one place, no searching.
+Anything a reinstall can erase is the wrong home for a key that cards in the field depend on.
+
+A related trap, since it cost a real key here: do **not** pick the state directory by probing for the
+identity file. If that file is what went missing, probing relocates the whole MCP and silently mints
+a new fleet — routing around the one guard that exists to stop it. Decide the directory first, then
+let the guard speak.
 
 **Validate before you bind.** The runner used to start the UI host and _then_ resolve the app, so a
 bad path left a listener on 9080 and reported a module error instead of the real cause.
@@ -334,6 +339,15 @@ counts escape bytes as visible cells and shreds the line.
 the value the RFC publishes.
 
 ---
+
+### Nothing has shipped yet
+
+No card is in a venue, so there is **no backward compatibility to keep**. The wire format, the state
+directory, `services.conf`, `config.txt` — all free to change outright. Do not add compat shims,
+version negotiation or migration paths for a fleet that does not exist; strip them if you find them.
+
+That changes the day a device is installed somewhere. From then on: positional fields append at the
+END only, and a card in the field cannot be updated over the wire.
 
 ## 7. Conventions
 
