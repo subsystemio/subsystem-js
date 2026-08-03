@@ -106,7 +106,7 @@ operator is one edit on the MCP.
 The room secret is optional and off by default. Without it, anyone who learns the MCP's public key
 can derive the topic and see that _some_ devices exist — they still cannot read state or command
 anything, because a subsystem drops every peer that is not its MCP before disclosing a thing. Turn
-it on with `mcp serve --private-room` if that metadata matters.
+it on with `mcp --private-room` if that metadata matters.
 
 ## Configuration
 

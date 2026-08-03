@@ -12,7 +12,7 @@ optional and strictly additive.
 | Repo                          | What it is                                          |
 | ----------------------------- | --------------------------------------------------- |
 | `subsystemio/runtime`         | `@subsystemio/runtime` — library + the `sub` runner |
-| `subsystemio/master-control`  | the MCP: `mcp serve` daemon + `mcp` console         |
+| `subsystemio/master-control`  | the MCP: `mcp` console, which hosts the fleet too   |
 | `subsystemio/subsystem-image` | flashable Raspberry Pi kiosk cards                  |
 
 **Nothing is on npm.** Install from GitHub (`npm install github:subsystemio/runtime`), and install
@@ -153,7 +153,7 @@ instead of a trip round every SD card.
 **A card carries no secrets.** No bearer credential to leak, nothing to rotate, no per-operator
 config anywhere near a device.
 
-The room secret is optional and off by default (`mcp serve --private-room`). Without it, someone who
+The room secret is optional and off by default (`mcp --private-room`). Without it, someone who
 learns the MCP's public key can derive the topic and see that devices exist — they still cannot read
 state or command anything. `guard()` is a no-op when no secret is configured; authority was never
 its job.
@@ -165,10 +165,23 @@ auto-adopted so there is always a way in.
 ## 4. The console
 
 ```sh
-mcp serve       # the daemon, one per installation
-mcp             # a console; --host=<64-hex> for a remote MCP
-mcp key         # the public key that goes on every card
+mcp                  # the console — and the daemon, if nothing else here is one
+mcp serve            # headless daemon only; what a systemd unit runs
+mcp install          # optional: keep it up across reboots
+mcp key / mcp room   # the public key for cards; the room secret if private
+mcp --host=<64-hex>  # attach to an MCP on another machine
 ```
+
+**`mcp` hosts the fleet itself** when nothing else on the machine does, so one command gives you a
+daemon and a TUI and other operators can attach over the swarm. The singleton lock on loopback 9599
+decides which process is the daemon — not a flag — so a second `mcp` attaches rather than splitting
+the fleet. Quitting takes the daemon with it; that is what `mcp install` is for when you don't want
+that. The daemon is a real hub, not a viewer: with none running, props still play their game
+perfectly but nobody can see or command them.
+
+The TUI is driven through a six-member interface (`subsystems`, `admin`, `commands`, `command`,
+`adopt`, `logLines`), so it cannot tell a remote `Client` from the in-process `LocalController`. Keep
+it that way — it is what let hosting be added without touching the UI.
 
 First run mints the MCP's keypair and prints its public key. Run **as many consoles as you like** —
 they are clients of the one daemon, so there is nothing to diverge. `A` adopts the selected
@@ -224,8 +237,8 @@ All of it is resolved in `bin/subsystem-image.js`; the shell scripts default not
 only ever one place that decides what a value is.
 
 `--mcp` and `--room` default to `mcp key` and `mcp room`, which means **master-control must be on
-your PATH** (`npm install -g github:subsystemio/master-control`) and `mcp serve` must have run once
-before you flash anything. A card flashed with no MCP key boots and works — it is simply invisible
+your PATH** (`npm install -g github:subsystemio/master-control`) and `mcp` must have run once before
+you flash anything. A card flashed with no MCP key boots and works — it is simply invisible
 to every console, forever. Never resolve a key by reaching into someone's checkout: that was the
 original design here and it hardcoded one developer's home directory into a shipping tool.
 
@@ -323,6 +336,13 @@ the value the RFC publishes.
 ---
 
 ## 7. Conventions
+
+- **Argument parsing is `paparam`** in every bin — `command()`, `flag()`, `arg()`, `summary()`,
+  `bail()`. It gives strict parsing, generated `--help` and one shape across the three tools. It runs
+  on Bare; pass `Bare.argv.slice(2)` explicitly rather than relying on its `process.argv` default.
+  Two things to know: the object handed to a runner is not the full `Command`, so call `help()` on the
+  outer command variable; and an unhandled bail prints a raw stack, so always register `bail()` and
+  print the reason yourself.
 
 - **Formatting**: `prettier-config-holepunch` via a `.prettierrc`. `npm run format` / `npm run lint`.
 - **HTML templates**: `const html = String.raw` and tag the literal, so prettier formats the markup

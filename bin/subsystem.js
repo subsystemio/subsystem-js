@@ -5,37 +5,14 @@ const b4a = require('b4a')
 const { UIHost } = require('../lib/ui-host.js')
 const { IPC } = require('../lib/ipc.js')
 const { roomKey } = require('../lib/room.js')
+const { command, flag, arg, summary, header, footer, bail } = require('paparam')
 
 // What runs on a Pi. One subsystem, one app, one physical element.
 //
-//   sub [appDir] [--port=9080] [--host=127.0.0.1] [--reset-after=20]
-//                      [--assets=<dir>] [--mcp=<64-hex>] [--room=<secret>]
-//
-// The app boots, serves its display and works with no network at all. A master controller is
-// strictly optional and strictly additive: it observes state and invokes commands the app declared
-// for itself. It cannot deploy code — apps ship on the SD card.
+// The app boots, serves its display and works with no network at all. An MCP is strictly optional
+// and strictly additive: it observes state and invokes commands the app declared for itself. It
+// cannot deploy code — apps ship on the SD card.
 const FW_VERSION = '0.4.0'
-
-const args = Bare.argv.slice(2)
-const appDir = path.resolve(args.find((a) => !a.startsWith('--')) || '.')
-// Checked before anything binds a port: starting the UI host and *then* failing to find the app
-// leaves a listener up and buries the real cause under a module error.
-if (!fs.existsSync(path.join(appDir, 'index.js'))) {
-  console.error('[subsystem] no index.js in ' + appDir)
-  console.error('[subsystem] usage: sub <appDir>')
-  Bare.exit(1)
-}
-const port = Number(flag('port') || 9080)
-const host = flag('host') || '127.0.0.1'
-const resetAfter = Number(flag('reset-after') || 0)
-// On a Pi this points at the FAT boot partition, so the art is editable by plugging the card into
-// a laptop. Locally it is just the app's own media dir.
-const assets = flag('assets') || path.join(appDir, 'media')
-
-function flag(name) {
-  const hit = args.find((a) => a.startsWith('--' + name + '='))
-  return hit && hit.slice(name.length + 3)
-}
 
 // What is actually on the card, as URLs the app can hand straight to its page. Apps are pure JS
 // with no filesystem, so the host has to tell them — that is what makes "drop a new jpg in
@@ -83,12 +60,13 @@ function trimmed(file) {
   return fs.existsSync(file) ? b4a.toString(fs.readFileSync(file), 'utf8').trim() : null
 }
 
-function mcpKey(config) {
-  const v = flag('mcp') || config.mcp || trimmed(path.join(appDir, '.mcp-key'))
+function mcpKey(cfg, config) {
+  const v = cfg.mcp || config.mcp || trimmed(path.join(cfg.appDir, '.mcp-key'))
   return v && /^[0-9a-f]{64}$/i.test(v.trim()) ? v.trim() : null
 }
 
-async function main() {
+async function main(cfg) {
+  const { appDir, host, port, assets, resetAfter } = cfg
   const ui = new UIHost({ host, port, assets, log: (m) => console.log('[ui]', m) })
   await ui.start()
 
@@ -124,7 +102,7 @@ async function main() {
   ipc.setState(1) // arm on boot — a subsystem is useful before anything upstream exists
   console.log('[subsystem] ' + path.basename(appDir) + ' armed at ' + ui.url())
 
-  const mcp = mcpKey(config)
+  const mcp = mcpKey(cfg, config)
   let link = null
   if (!mcp) {
     console.log('[subsystem] no `mcp` key configured — running unwatched, which is a valid mode')
@@ -132,7 +110,7 @@ async function main() {
     const { Link } = require('../lib/link.js')
     link = new Link(ipc, {
       mcpKey: mcp,
-      roomKey: roomKey(flag('room') || config.room), // optional: privacy, never authority
+      roomKey: roomKey(cfg.room || config.room), // optional: privacy, never authority
       storeDir: path.join(appDir, '.identity'),
       fwVersion: FW_VERSION,
       log: (m) => console.log('[link]', m)
@@ -146,7 +124,57 @@ async function main() {
   })
 }
 
-main().catch((e) => {
-  console.error('[subsystem] fatal', e)
+// paparam throws a raw Bail otherwise, which reads like a crash for what is usually a typo.
+function onBail(b) {
+  if (b.err) console.error('sub: ' + b.err.message)
+  else if (b.reason === 'UNKNOWN_FLAG') console.error('sub: unknown flag --' + b.flag.name)
+  else if (b.reason === 'UNKNOWN_ARG') console.error('sub: unknown command or argument')
+  else if (b.reason === 'MISSING_ARG') console.error('sub: missing argument')
+  else console.error('sub: ' + b.reason)
+  console.error("try 'sub --help'")
   Bare.exit(1)
-})
+}
+
+const cli = command(
+  'sub',
+  bail(onBail),
+  header('Run one subsystem: an app, its display, and an optional link to an MCP.'),
+  summary('run a subsystem'),
+  arg('[appDir]', 'the app to run; defaults to the current directory'),
+  flag('--port [port]', 'HTTP port for the display (default 9080)'),
+  flag('--host [host]', 'interface to bind (default 127.0.0.1)'),
+  flag('--assets [dir]', 'where media and config.txt live (default <appDir>/media)'),
+  flag('--reset-after [seconds]', 'reset this long after the app reports complete; 0 disables'),
+  flag('--mcp [64-hex]', 'public key of the MCP to answer to; overrides config.txt'),
+  flag('--room [secret]', 'room secret, if the fleet is private'),
+  footer('a subsystem runs whether or not anyone is watching — that is the point'),
+  async (cmd) => {
+    const appDir = path.resolve(cmd.args.appDir || '.')
+    // Checked before anything binds a port: starting the UI host and *then* failing to find the app
+    // leaves a listener up and buries the real cause under a module error.
+    if (!fs.existsSync(path.join(appDir, 'index.js'))) {
+      console.error('[subsystem] no index.js in ' + appDir)
+      console.error('[subsystem] usage: sub <appDir>')
+      return Bare.exit(1)
+    }
+    await main({
+      appDir,
+      port: Number(cmd.flags.port || 9080),
+      host: cmd.flags.host || '127.0.0.1',
+      // On a Pi this points at the FAT boot partition, so the art is editable by plugging the card
+      // into a laptop. Locally it is just the app's own media dir.
+      assets: cmd.flags.assets || path.join(appDir, 'media'),
+      resetAfter: Number(cmd.flags.resetAfter || 0),
+      mcp: cmd.flags.mcp,
+      room: cmd.flags.room
+    })
+  }
+)
+
+const parsed = cli.parse(Bare.argv.slice(2))
+if (parsed && parsed.running) {
+  parsed.running.catch((e) => {
+    console.error('[subsystem] fatal', e)
+    Bare.exit(1)
+  })
+}
