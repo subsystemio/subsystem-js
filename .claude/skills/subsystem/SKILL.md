@@ -190,6 +190,21 @@ its job.
 never believed, never obeyed, until an admin adopts it. The first operator on an empty roster is
 auto-adopted so there is always a way in.
 
+**Operators are identities; subsystems are device keys.** A person's roster line is their identity, so
+it covers every machine they attest to it — `mcp login --words=…` joins a second machine with no
+roster edit, and revoking the one line locks all of them out. A prop is one box doing one job, so
+there is nothing for an identity to span and its device key is the roster entry.
+
+Note the asymmetry in how the two are verified. A prop knows the identity it expects (it is on the
+card), so it passes `expectedIdentity`. The MCP does **not** know an operator's identity in advance —
+anyone may present one and arrives pending — so it passes only `expectedDevice` and reads the identity
+out of the proof, then consults the roster. Dropping `expectedDevice` there would let a copied proof
+from an adopted operator be replayed by anyone holding it.
+
+`roster.txt` is re-read on every admission, because the README promises you can edit it by hand and
+`mcp trust`/`mcp revoke` write it from another process. Loading it once at startup made both silently
+need a restart.
+
 ## 4. The console
 
 ```sh
