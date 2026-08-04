@@ -59,7 +59,9 @@ function trimmed(file) {
   return fs.existsSync(file) ? b4a.toString(fs.readFileSync(file), 'utf8').trim() : null
 }
 
-function mcpKey(cfg, config) {
+// The root identity this prop answers to. PUBLIC — losing a card leaks nothing, and the card can
+// verify an attestation but never mint one.
+function identityKey(cfg, config) {
   const v = cfg.mcp || config.mcp || trimmed(path.join(cfg.appDir, '.mcp-key'))
   return v && /^[0-9a-f]{64}$/i.test(v.trim()) ? v.trim() : null
 }
@@ -101,16 +103,19 @@ async function main(cfg) {
   ipc.setState(1) // arm on boot — a subsystem is useful before anything upstream exists
   console.log('[subsystem] ' + path.basename(appDir) + ' armed at ' + ui.url())
 
-  const mcp = mcpKey(cfg, config)
+  const identity = identityKey(cfg, config)
   let link = null
-  if (!mcp) {
-    console.log('[subsystem] no `mcp` key configured — running unwatched, which is a valid mode')
+  if (!identity) {
+    console.log(
+      '[subsystem] no `mcp` identity configured — running unwatched, which is a valid mode'
+    )
   } else {
     const { Link } = require('../lib/link.js')
     link = new Link(ipc, {
-      mcpKey: mcp,
+      identityKey: identity,
       roomKey: roomKey(cfg.room || config.room), // optional: privacy, never authority
       storeDir: path.join(appDir, '.identity'),
+      receiptFile: path.join(appDir, '.receipt'),
       log: (m) => console.log('[link]', m)
     })
     link.open()

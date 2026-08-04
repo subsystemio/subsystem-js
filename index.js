@@ -7,5 +7,6 @@ module.exports = {
   channels: require('./lib/channels.js'),
   protocol: require('./lib/protocol.js'),
   room: require('./lib/room.js'),
-  identity: require('./lib/identity.js')
+  identity: require('./lib/identity.js'),
+  attest: require('./lib/attest.js')
 }

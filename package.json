@@ -35,6 +35,7 @@
     "hypercore-crypto": "^3.7.0",
     "hyperswarm": "^4.17.0",
     "hyperswarm-capability": "^1.1.1",
+    "keet-identity-key": "^3.2.0",
     "paparam": "^1.10.2",
     "protomux": "^3.11.0"
   },
