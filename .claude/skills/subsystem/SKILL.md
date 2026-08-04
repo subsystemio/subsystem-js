@@ -144,14 +144,42 @@ There is exactly one MCP per installation. Subsystems trust it and nothing else;
 the MCP and never to a subsystem. That one rule is what makes access management a single edit
 instead of a trip round every SD card.
 
-| Job                         | Mechanism                                             | On the card               |
-| --------------------------- | ----------------------------------------------------- | ------------------------- |
-| Find the fleet              | topic = one-way hash of the MCP's **public** key      | a public key              |
-| **Command** a subsystem     | the peer _is_ that MCP, proven by the Noise handshake | nothing                   |
-| Hide the fleet _(optional)_ | a room secret mixed into the topic                    | a secret, if you want one |
+| Job                         | Mechanism                                                 | On the card               |
+| --------------------------- | --------------------------------------------------------- | ------------------------- |
+| Find the fleet              | topic = one-way hash of the **root identity** public key  | a public key              |
+| **Command** a subsystem     | a proof that the peer's key was attested by that identity | nothing                   |
+| Hide the fleet _(optional)_ | a room secret mixed into the topic                        | a secret, if you want one |
 
-**A card carries no secrets.** No bearer credential to leak, nothing to rotate, no per-operator
-config anywhere near a device.
+**A fleet is an identity, not a machine.** A card carries the root identity's public key; the MCP
+presents a proof (`lib/attest.js`, `keet-identity-key`) that its own device key belongs to that
+identity. So the MCP box can be replaced or kept as a spare and every prop still accepts it, with
+nothing reflashed — and re-attesting mints a newer epoch, which is how a stolen box gets revoked.
+
+**A card carries no secrets.** It can verify an attestation and never mint one: minting needs the
+identity's mnemonic, which lives offline and never touches the MCP box (`mcp identity` / `mcp attest`
+run on a different machine; only the proof comes back, and a proof grants nothing alone).
+
+The honest trade: the mnemonic becomes the one unrevocable secret. A stolen box can be retired; a
+stolen mnemonic cannot, short of reflashing every card.
+
+### The two rules of verifying an attestation
+
+Both, or it is broken:
+
+1. the proof chains to **the identity on our card**, and
+2. it attests **the public key of the peer actually on this connection**.
+
+Skip the second and a genuine proof minted for some other box is replayable by anyone who can reach
+the topic. `attest.verify(proof, identityKey, socket.remotePublicKey, receipt)` does both.
+
+**A proof is untrusted bytes.** Malformed input throws out of `compact-encoding`, and an uncaught
+throw on a prop under `Restart=always` is a remote reboot loop for anyone who can reach the topic.
+`verify` returns `null` instead. Validating hostile wire input is not the same thing as defensive
+guards against caller bugs — do it.
+
+A prop therefore cannot judge a peer on its key alone any more: the connection opens, and **both**
+gates (room secret, attestation) must pass before any state, manifest or command crosses. Unattested
+peers are dropped after 10s.
 
 The room secret is optional and off by default (`mcp --private-room`). Without it, someone who
 learns the MCP's public key can derive the topic and see that devices exist — they still cannot read
@@ -165,6 +193,8 @@ auto-adopted so there is always a way in.
 ## 4. The console
 
 ```sh
+mcp identity         # OFFLINE: mint a fleet identity, 24 words printed once
+mcp device           # the box's own key; `mcp attest <it>` offline, `mcp proof <hex>` here
 mcp                  # the console — and the daemon, if nothing else here is one
 mcp serve            # headless daemon only; what a systemd unit runs
 mcp install          # optional: keep it up across reboots
